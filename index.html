@@ -254,11 +254,11 @@
     </div>
 
     <label>Påminn meg om backup</label>
-    <select id="reminder-days">
-      <option value="1">Hver dag</option>
-      <option value="3">Hver 3. dag</option>
-      <option value="7" selected>Hver uke</option>
-      <option value="14">Hver 14. dag</option>
+    <select id="reminder-every">
+      <option value="5">Hver 5. registrering</option>
+      <option value="10" selected>Hver 10. registrering</option>
+      <option value="20">Hver 20. registrering</option>
+      <option value="50">Hver 50. registrering</option>
       <option value="0">Aldri</option>
     </select>
   </div>
@@ -345,8 +345,8 @@ function save(){
   }
 }
 function loadMeta(){
-  try{ return Object.assign({lastBackupTs:0, lastBackupCount:0, reminderDays:7, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}, JSON.parse(localStorage.getItem(META_KEY))||{}); }
-  catch(e){ return {lastBackupTs:0, lastBackupCount:0, reminderDays:7, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}; }
+  try{ return Object.assign({lastBackupTs:0, lastBackupCount:0, reminderEvery:10, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}, JSON.parse(localStorage.getItem(META_KEY))||{}); }
+  catch(e){ return {lastBackupTs:0, lastBackupCount:0, reminderEvery:10, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}; }
 }
 function saveMeta(){ localStorage.setItem(META_KEY, JSON.stringify(meta)); }
 function catOf(id){ return CATS.find(c=>c.id===id) || {id:'annet',name:'Annet',ico:'📦'}; }
@@ -616,9 +616,9 @@ function renderBackupStatus(){
 }
 
 function isOverdue(){
-  if(meta.reminderDays===0) return false;            // påminnelse av
-  if(!meta.lastBackupTs) return entries.length>0;     // aldri tatt backup, men har data
-  return daysSinceBackup() >= meta.reminderDays && newSinceBackup() > 0;
+  const every = meta.reminderEvery||0;
+  if(every<=0) return false;                 // påminnelse av
+  return newSinceBackup() >= every;          // f.eks. 10 nye registreringer siden siste backup
 }
 
 let bannerDismissed=false;
@@ -774,9 +774,9 @@ document.getElementById('file-restore').onchange=function(){
 };
 
 // påminnelse-innstilling
-const rd=document.getElementById('reminder-days');
-rd.value=String(meta.reminderDays);
-rd.onchange=()=>{ meta.reminderDays=parseInt(rd.value,10); saveMeta(); renderBanner(); };
+const rd=document.getElementById('reminder-every');
+rd.value=String(meta.reminderEvery);
+rd.onchange=()=>{ meta.reminderEvery=parseInt(rd.value,10); saveMeta(); renderBanner(); };
 
 // budsjett
 const bi=document.getElementById('budget-input');
