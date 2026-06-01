@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Handlelogg</title>
+<style>
+  :root{
+    --bg:#0b1120; --card:#131c2e; --card2:#1b2740; --line:#243149;
+    --txt:#e6edf6; --muted:#8a98ad; --accent:#14b8a6; --accent2:#0d9488;
+    --danger:#ef4444; --warn:#f59e0b; --good:#22c55e;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--txt);
+    padding-bottom:90px; min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(180deg,#0f766e,#0d9488);
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;
+    box-shadow:0 2px 12px rgba(0,0,0,.35);
+  }
+  header h1{margin:0; font-size:20px; font-weight:700; letter-spacing:.3px}
+  header .sub{margin-top:2px; font-size:12px; opacity:.85}
+  .wrap{padding:16px; max-width:560px; margin:0 auto}
+
+  .summary{display:flex; gap:10px; margin-bottom:16px}
+  .stat{
+    flex:1; background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:12px;
+  }
+  .stat .label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px}
+  .stat .val{font-size:20px; font-weight:700; margin-top:4px}
+
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:16px; padding:16px; margin-bottom:16px;
+  }
+  .card h2{margin:0 0 12px; font-size:15px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px}
+
+  label{display:block; font-size:13px; color:var(--muted); margin:10px 0 5px}
+  input,select,textarea{
+    width:100%; padding:13px 14px; font-size:16px;
+    background:var(--card2); color:var(--txt);
+    border:1px solid var(--line); border-radius:11px; outline:none;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  textarea{resize:vertical; min-height:46px}
+  .row{display:flex; gap:10px}
+  .row > *{flex:1}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+  .chip{
+    padding:9px 13px; border-radius:999px; font-size:14px;
+    background:var(--card2); border:1px solid var(--line); color:var(--txt);
+    cursor:pointer; transition:.15s;
+  }
+  .chip.active{background:var(--accent); border-color:var(--accent); color:#04221f; font-weight:600}
+
+  button.primary{
+    width:100%; margin-top:16px; padding:15px; font-size:16px; font-weight:700;
+    background:var(--accent); color:#04221f; border:none; border-radius:12px; cursor:pointer;
+  }
+  button.primary:active{background:var(--accent2)}
+
+  .filterbar{display:flex; gap:8px; margin-bottom:12px}
+  .filterbar select{flex:1}
+
+  .day{margin-bottom:18px}
+  .day-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:0 4px 8px; border-bottom:1px solid var(--line); margin-bottom:8px;
+  }
+  .day-head .date{font-weight:700; font-size:15px}
+  .day-head .total{font-weight:700; font-size:15px; color:var(--accent)}
+
+  .entry{
+    display:flex; align-items:center; gap:12px;
+    background:var(--card); border:1px solid var(--line);
+    border-radius:13px; padding:12px 14px; margin-bottom:8px;
+  }
+  .entry .ico{font-size:22px; width:30px; text-align:center}
+  .entry .mid{flex:1; min-width:0}
+  .entry .mid .t{font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .entry .mid .m{font-size:12px; color:var(--muted); margin-top:2px}
+  .entry .amt{font-weight:700; font-size:16px; white-space:nowrap}
+  .entry .del{
+    background:transparent; border:none; color:var(--muted); font-size:20px;
+    cursor:pointer; padding:4px 2px;
+  }
+
+  .empty{text-align:center; color:var(--muted); padding:40px 20px; font-size:14px}
+
+  nav{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    display:flex; background:var(--card); border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav button{
+    flex:1; background:none; border:none; color:var(--muted);
+    padding:12px 0 10px; font-size:11px; cursor:pointer; font-weight:600;
+  }
+  nav button .ni{display:block; font-size:21px; margin-bottom:2px}
+  nav button.active{color:var(--accent)}
+
+  .hidden{display:none}
+
+  .banner{
+    padding:12px 16px; font-size:13px; line-height:1.4;
+    display:flex; align-items:center; gap:12px; justify-content:space-between;
+  }
+  .banner.warn{background:#7c2d12; color:#fed7aa}
+  .banner.ok{background:#14532d; color:#bbf7d0}
+  .banner button{
+    background:#fff; color:#111; border:none; border-radius:9px;
+    padding:9px 13px; font-weight:700; font-size:13px; white-space:nowrap; cursor:pointer;
+  }
+  .banner .x{background:transparent; color:inherit; padding:6px; font-size:16px}
+
+  .status{
+    background:var(--card2); border:1px solid var(--line); border-radius:11px;
+    padding:11px 13px; font-size:13px; color:var(--muted); margin-bottom:6px;
+  }
+  .status b{color:var(--txt)}
+  .hint{font-size:12px; color:var(--muted); margin:8px 2px 0; line-height:1.5}
+
+  .breakdown-row{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line)}
+  .breakdown-row:last-child{border-bottom:none}
+  .breakdown-row .ico{font-size:20px; width:28px; text-align:center}
+  .breakdown-row .nm{flex:1}
+  .breakdown-row .bar{height:6px; background:var(--card2); border-radius:4px; flex:2; overflow:hidden}
+  .breakdown-row .bar > div{height:100%; background:var(--accent)}
+  .breakdown-row .bv{font-weight:700; width:80px; text-align:right}
+
+  .toolbtn{
+    background:var(--card2); color:var(--txt); border:1px solid var(--line);
+    border-radius:11px; padding:13px; font-size:14px; cursor:pointer; width:100%; margin-top:10px; font-weight:600;
+  }
+  .toolbtn.danger{color:var(--danger); border-color:#5b2330}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛒 Handlelogg</h1>
+  <div class="sub">Logg handlerutiner og kostnader</div>
+</header>
+
+<div id="backup-banner" class="banner warn hidden"></div>
+
+<!-- ============ LOGG (registrer) ============ -->
+<section id="view-log" class="wrap">
+  <div class="summary">
+    <div class="stat"><div class="label">I dag</div><div class="val" id="s-today">0 kr</div></div>
+    <div class="stat"><div class="label">Denne uken</div><div class="val" id="s-week">0 kr</div></div>
+    <div class="stat"><div class="label">Denne mnd</div><div class="val" id="s-month">0 kr</div></div>
+  </div>
+
+  <div class="card hidden" id="budget-card">
+    <h2 style="margin-bottom:8px">Månedsbudsjett</h2>
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+      <span id="budget-text" style="color:var(--muted)"></span>
+      <span id="budget-left" style="font-weight:700"></span>
+    </div>
+    <div style="height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
+      <div id="budget-bar" style="height:100%;width:0;background:var(--good);transition:.3s"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ny registrering</h2>
+    <label>Kategori</label>
+    <div class="chips" id="cat-chips"></div>
+
+    <div class="row">
+      <div>
+        <label>Beløp (kr)</label>
+        <input id="f-amount" type="number" inputmode="decimal" placeholder="0" step="0.01">
+      </div>
+      <div>
+        <label>Sted / butikk</label>
+        <input id="f-place" type="text" placeholder="f.eks. Rema 1000" list="places">
+        <datalist id="places"></datalist>
+      </div>
+    </div>
+
+    <label>Notat (valgfritt)</label>
+    <input id="f-note" type="text" placeholder="Hva handlet du?">
+
+    <label>Dato</label>
+    <input id="f-date" type="date">
+
+    <button class="primary" id="btn-add">Legg til</button>
+  </div>
+</section>
+
+<!-- ============ HISTORIKK ============ -->
+<section id="view-history" class="wrap hidden">
+  <div class="filterbar">
+    <select id="filter-cat"><option value="">Alle kategorier</option></select>
+    <select id="filter-period">
+      <option value="all">Alle datoer</option>
+      <option value="today">I dag</option>
+      <option value="week">Denne uken</option>
+      <option value="month">Denne måneden</option>
+    </select>
+  </div>
+  <div id="history-list"></div>
+</section>
+
+<!-- ============ OVERSIKT (statistikk) ============ -->
+<section id="view-stats" class="wrap hidden">
+  <div class="card">
+    <h2>Forbruk siste ukene</h2>
+    <div id="trend"></div>
+  </div>
+
+  <div class="card">
+    <h2>Forbruk per kategori — denne måneden</h2>
+    <div id="breakdown"></div>
+  </div>
+  <div class="card">
+    <h2>Mest besøkte steder</h2>
+    <div id="places-stats"></div>
+  </div>
+  <div class="card">
+    <h2>Sikkerhetskopi til iCloud</h2>
+    <div class="status" id="backup-status">Ingen backup tatt enda.</div>
+    <button class="toolbtn" id="btn-backup" style="background:var(--accent);color:#04221f">☁️ Ta backup nå (velg mappe)</button>
+    <button class="toolbtn" id="btn-shortcut" style="background:var(--card2)">⚡ Auto-backup til iCloud-mappe</button>
+    <button class="toolbtn" id="btn-restore">↩️ Gjenopprett fra backup</button>
+    <input id="file-restore" type="file" accept=".json,application/json" class="hidden">
+    <p class="hint">
+      <b>☁️ Ta backup nå:</b> åpner delemenyen → <b>«Lagre i Filer»</b> → <b>iCloud Drive</b>.<br>
+      <b>⚡ Auto-backup:</b> kopierer dataene og kjører iOS-snarveien din, som lagrer
+      rett i én fast iCloud-mappe — uten å velge mappe hver gang.
+      <span id="shortcut-setup" style="color:var(--accent);text-decoration:underline">Slik setter du opp snarveien ›</span>
+    </p>
+    <div id="shortcut-guide" class="hidden" style="background:var(--card2);border-radius:11px;padding:12px;font-size:12.5px;line-height:1.6;margin-top:8px">
+      <b>Engangsoppsett (1 min) i Snarveier-appen:</b><br>
+      1. Åpne <b>Snarveier</b> → <b>+</b> (ny snarvei).<br>
+      2. Legg til handling <b>«Hent utklippstavle»</b>.<br>
+      3. Legg til <b>«Lagre fil»</b>. Slå AV «Spør hvor». Velg mappen
+      <b>iCloud Drive ▸ Handlelogg</b>. Sett filnavn (f.eks. <code>handlelogg.json</code>) og slå PÅ «Overskriv».<br>
+      4. Gi snarveien navnet under (må stemme nøyaktig), og lagre.
+      <label style="margin-top:8px">Navn på snarvei</label>
+      <input id="shortcut-name" type="text" placeholder="Handlelogg Backup">
+    </div>
+
+    <label>Påminn meg om backup</label>
+    <select id="reminder-days">
+      <option value="1">Hver dag</option>
+      <option value="3">Hver 3. dag</option>
+      <option value="7" selected>Hver uke</option>
+      <option value="14">Hver 14. dag</option>
+      <option value="0">Aldri</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>Månedsbudsjett</h2>
+    <label>Sett et månedlig budsjett (kr) — 0 = av</label>
+    <input id="budget-input" type="number" inputmode="decimal" placeholder="0" step="100">
+    <p class="hint">Når budsjettet er satt vises en fremdriftslinje på Logg-fanen, og du varsles når du nærmer deg grensen.</p>
+  </div>
+
+  <div class="card">
+    <h2>Kategorier</h2>
+    <div id="cat-manager"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="new-cat-ico" type="text" placeholder="🛍️" maxlength="2" style="flex:0 0 64px;text-align:center">
+      <input id="new-cat-name" type="text" placeholder="Ny kategori">
+    </div>
+    <button class="toolbtn" id="btn-add-cat" style="background:var(--card2)">➕ Legg til kategori</button>
+  </div>
+
+  <div class="card">
+    <h2>Annen eksport</h2>
+    <button class="toolbtn" id="btn-export">⬇️ Eksporter til regneark (CSV)</button>
+    <button class="toolbtn danger" id="btn-clear">🗑️ Slett alle data</button>
+  </div>
+</section>
+
+<nav>
+  <button data-view="log" class="active"><span class="ni">➕</span>Logg</button>
+  <button data-view="history"><span class="ni">📋</span>Historikk</button>
+  <button data-view="stats"><span class="ni">📊</span>Oversikt</button>
+</nav>
+
+<script>
+const DEFAULT_CATS = [
+  {id:'dagligvarer', name:'Dagligvarer', ico:'🛒'},
+  {id:'mat-ute',     name:'Mat ute',     ico:'🍔'},
+  {id:'kaffe',       name:'Kaffe',       ico:'☕'},
+  {id:'transport',   name:'Transport',   ico:'🚌'},
+  {id:'drivstoff',   name:'Drivstoff',   ico:'⛽'},
+  {id:'apotek',      name:'Apotek',      ico:'💊'},
+  {id:'klar',        name:'Klær',        ico:'👕'},
+  {id:'fritid',      name:'Fritid',      ico:'🎬'},
+  {id:'regninger',   name:'Regninger',   ico:'🧾'},
+  {id:'annet',       name:'Annet',       ico:'📦'},
+];
+const KEY = 'handlelogg.v1';
+const CAT_KEY = 'handlelogg.cats.v1';
+const BAK_KEY = 'handlelogg.v1.bak';   // rullerende nød-kopi i nettleseren
+const META_KEY = 'handlelogg.meta.v1'; // backup-status + innstillinger
+
+let entries = load();
+let meta = loadMeta();
+let CATS = loadCats();
+let selectedCat = CATS[0].id;
+
+function loadCats(){
+  try{ const c=JSON.parse(localStorage.getItem(CAT_KEY)); if(Array.isArray(c) && c.length) return c; }catch(e){}
+  return DEFAULT_CATS.slice();
+}
+function saveCats(){ localStorage.setItem(CAT_KEY, JSON.stringify(CATS)); }
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(KEY)) || []; }
+  catch(e){
+    // hovedlager korrupt? prøv nød-kopien
+    try{ return JSON.parse(localStorage.getItem(BAK_KEY)) || []; }catch(e2){ return []; }
+  }
+}
+function save(){
+  try{
+    // skriv nød-kopi av forrige tilstand FØR vi overskriver hovedlageret
+    try{ localStorage.setItem(BAK_KEY, localStorage.getItem(KEY) || '[]'); }catch(e){}
+    localStorage.setItem(KEY, JSON.stringify(entries));
+    return true;
+  }catch(e){
+    alert('⚠️ Kunne ikke lagre på denne enheten.\n\n'+
+      'Lagring er blokkert. Dette skjer hvis appen åpnes i Filer-appens '+
+      'forhåndsvisning eller i privat nettlesing.\n\n'+
+      'Løsning: Åpne filen i Safari, og legg den til på Hjem-skjermen '+
+      '(Del → «Legg til på Hjem-skjerm»). Da lagres alt riktig.');
+    return false;
+  }
+}
+function loadMeta(){
+  try{ return Object.assign({lastBackupTs:0, lastBackupCount:0, reminderDays:7, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}, JSON.parse(localStorage.getItem(META_KEY))||{}); }
+  catch(e){ return {lastBackupTs:0, lastBackupCount:0, reminderDays:7, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}; }
+}
+function saveMeta(){ localStorage.setItem(META_KEY, JSON.stringify(meta)); }
+function catOf(id){ return CATS.find(c=>c.id===id) || {id:'annet',name:'Annet',ico:'📦'}; }
+function fmt(n){ return new Intl.NumberFormat('no-NO',{maximumFractionDigits:2}).format(n) + ' kr'; }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// ---- periode-hjelpere ----
+function startOfWeek(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+function inPeriod(dateStr, period){
+  if(period==='all') return true;
+  const d=new Date(dateStr+'T00:00:00'); const now=new Date(); now.setHours(0,0,0,0);
+  if(period==='today') return dateStr===todayStr();
+  if(period==='week'){ return d>=startOfWeek(now); }
+  if(period==='month'){ return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); }
+  return true;
+}
+function sumPeriod(period){ return entries.filter(e=>inPeriod(e.date,period)).reduce((a,e)=>a+e.amount,0); }
+
+// ---- render chips ----
+function renderChips(){
+  const c=document.getElementById('cat-chips'); c.innerHTML='';
+  CATS.forEach(cat=>{
+    const el=document.createElement('div');
+    el.className='chip'+(cat.id===selectedCat?' active':'');
+    el.textContent=cat.ico+' '+cat.name;
+    el.onclick=()=>{ selectedCat=cat.id; renderChips(); };
+    c.appendChild(el);
+  });
+}
+
+// ---- filter-dropdown for kategori ----
+function renderCatFilter(){
+  const sel=document.getElementById('filter-cat');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Alle kategorier</option>';
+  CATS.forEach(cat=>{
+    const o=document.createElement('option'); o.value=cat.id; o.textContent=cat.ico+' '+cat.name; sel.appendChild(o);
+  });
+  sel.value=cur;
+}
+
+// ---- datalist for steder ----
+function renderPlaces(){
+  const dl=document.getElementById('places');
+  const set=[...new Set(entries.map(e=>e.place).filter(Boolean))];
+  dl.innerHTML = set.map(p=>`<option value="${escapeHtml(p)}">`).join('');
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// ---- legg til ----
+function addEntry(){
+  const amount=parseFloat(document.getElementById('f-amount').value.replace(',','.'));
+  if(isNaN(amount) || amount<=0){ alert('Skriv inn et gyldig beløp.'); return; }
+  const e={
+    id:String(Date.now())+Math.floor(Math.random()*1000),
+    cat:selectedCat,
+    amount:amount,
+    place:document.getElementById('f-place').value.trim(),
+    note:document.getElementById('f-note').value.trim(),
+    date:document.getElementById('f-date').value || todayStr(),
+    ts:Date.now()
+  };
+  entries.push(e); save();
+  document.getElementById('f-amount').value='';
+  document.getElementById('f-place').value='';
+  document.getElementById('f-note').value='';
+  refreshAll();
+  // liten bekreftelse
+  const btn=document.getElementById('btn-add'); const old=btn.textContent;
+  btn.textContent='✓ Lagret'; setTimeout(()=>btn.textContent=old,900);
+}
+
+function delEntry(id){
+  if(!confirm('Slette denne registreringen?')) return;
+  entries=entries.filter(e=>e.id!==id); save(); refreshAll();
+}
+
+// ---- summer ----
+function renderSummary(){
+  document.getElementById('s-today').textContent=fmt(sumPeriod('today'));
+  document.getElementById('s-week').textContent=fmt(sumPeriod('week'));
+  document.getElementById('s-month').textContent=fmt(sumPeriod('month'));
+}
+
+// ---- historikk ----
+function renderHistory(){
+  const cat=document.getElementById('filter-cat').value;
+  const period=document.getElementById('filter-period').value;
+  const list=document.getElementById('history-list');
+  let rows=entries.filter(e=>(!cat||e.cat===cat) && inPeriod(e.date,period));
+  rows.sort((a,b)=>b.ts-a.ts);
+  if(rows.length===0){ list.innerHTML='<div class="empty">Ingen registreringer enda.<br>Logg din første kostnad! 🛒</div>'; return; }
+
+  // grupper per dag
+  const groups={};
+  rows.forEach(e=>{ (groups[e.date]=groups[e.date]||[]).push(e); });
+  const days=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+
+  list.innerHTML = days.map(date=>{
+    const dayTotal=groups[date].reduce((a,e)=>a+e.amount,0);
+    const items=groups[date].map(e=>{
+      const c=catOf(e.cat);
+      const meta=[c.name, e.place, e.note].filter(Boolean).join(' · ');
+      return `<div class="entry">
+        <div class="ico">${c.ico}</div>
+        <div class="mid"><div class="t">${escapeHtml(e.place||c.name)}</div><div class="m">${escapeHtml(meta)}</div></div>
+        <div class="amt">${fmt(e.amount)}</div>
+        <button class="del" onclick="delEntry('${e.id}')">✕</button>
+      </div>`;
+    }).join('');
+    return `<div class="day">
+      <div class="day-head"><span class="date">${fmtDate(date)}</span><span class="total">${fmt(dayTotal)}</span></div>
+      ${items}
+    </div>`;
+  }).join('');
+}
+
+function fmtDate(d){
+  const dt=new Date(d+'T00:00:00');
+  const days=['søn','man','tir','ons','tor','fre','lør'];
+  const mon=['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  if(d===todayStr()) return 'I dag';
+  const y=new Date(); y.setDate(y.getDate()-1);
+  if(d===y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0')) return 'I går';
+  return `${days[dt.getDay()]}. ${dt.getDate()}. ${mon[dt.getMonth()]}`;
+}
+
+// ---- statistikk ----
+function renderStats(){
+  const monthEntries=entries.filter(e=>inPeriod(e.date,'month'));
+  const total=monthEntries.reduce((a,e)=>a+e.amount,0);
+  const byCat={};
+  monthEntries.forEach(e=>{ byCat[e.cat]=(byCat[e.cat]||0)+e.amount; });
+  const bd=document.getElementById('breakdown');
+  const cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+  if(cats.length===0){ bd.innerHTML='<div class="empty">Ingen data denne måneden.</div>'; }
+  else{
+    bd.innerHTML=cats.map(id=>{
+      const c=catOf(id); const v=byCat[id]; const pct=total? Math.round(v/total*100):0;
+      return `<div class="breakdown-row">
+        <div class="ico">${c.ico}</div>
+        <div class="nm">${c.name}<div style="font-size:11px;color:var(--muted)">${pct}%</div></div>
+        <div class="bar"><div style="width:${pct}%"></div></div>
+        <div class="bv">${fmt(v)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // steder
+  const byPlace={};
+  entries.forEach(e=>{ if(e.place) byPlace[e.place]=(byPlace[e.place]||0)+e.amount; });
+  const places=Object.keys(byPlace).sort((a,b)=>byPlace[b]-byPlace[a]).slice(0,8);
+  const ps=document.getElementById('places-stats');
+  ps.innerHTML = places.length? places.map(p=>
+    `<div class="breakdown-row"><div class="nm">📍 ${escapeHtml(p)}</div><div class="bv">${fmt(byPlace[p])}</div></div>`
+  ).join('') : '<div class="empty">Ingen steder registrert.</div>';
+}
+
+// ---- eksport / backup ----
+function exportCSV(){
+  const head=['Dato','Kategori','Beløp','Sted','Notat'];
+  const lines=[head.join(';')];
+  entries.slice().sort((a,b)=>a.ts-b.ts).forEach(e=>{
+    lines.push([e.date, catOf(e.cat).name, String(e.amount).replace('.',','), e.place||'', (e.note||'').replace(/[;\n]/g,' ')].join(';'));
+  });
+  download('handlelogg.csv', '﻿'+lines.join('\n'), 'text/csv');
+}
+function download(name, content, type){
+  const blob=new Blob([content],{type:type+';charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{a.remove(); URL.revokeObjectURL(a.href);},1000);
+}
+
+// ---- BACKUP til iCloud (iOS Del-ark → Lagre i Filer) ----
+async function backupNow(){
+  const payload = JSON.stringify({app:'handlelogg', version:1, exported:todayStr(), count:entries.length, entries}, null, 2);
+  const fname = 'handlelogg-' + todayStr() + '.json';
+  const file = new File([payload], fname, {type:'application/json'});
+  let done = false;
+
+  // Beste vei på iPhone: del-arket lar deg "Lagre i Filer" → iCloud Drive
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title:'Handlelogg backup'});
+      done = true;
+    }catch(err){
+      if(err && err.name==='AbortError') return; // bruker avbrøt – ikke marker som tatt
+    }
+  }
+  if(!done){
+    // Fallback: last ned → iOS spør "Lagre i Filer" → iCloud Drive
+    download(fname, payload, 'application/json');
+  }
+
+  meta.lastBackupTs = Date.now();
+  meta.lastBackupCount = entries.length;
+  saveMeta();
+  renderBackupStatus(); renderBanner();
+}
+
+// ---- GJENOPPRETT fra backup-fil ----
+function restoreFromFile(fileObj){
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try{
+      const parsed = JSON.parse(reader.result);
+      data = Array.isArray(parsed) ? parsed : parsed.entries;
+    }catch(e){ alert('Kunne ikke lese filen. Er det en gyldig backup?'); return; }
+    if(!Array.isArray(data)){ alert('Fant ingen registreringer i filen.'); return; }
+
+    const valid = data.filter(e=>e && e.id && typeof e.amount==='number' && e.date);
+    if(valid.length===0){ alert('Fant ingen gyldige registreringer i filen.'); return; }
+
+    const choice = confirm(
+      `Backup inneholder ${valid.length} registreringer.\n\n`+
+      `OK = SLÅ SAMMEN med det du har nå (anbefalt)\n`+
+      `Avbryt = velg å erstatte alt i stedet`
+    );
+    if(choice){
+      // slå sammen på id (unngå duplikater)
+      const map = new Map(entries.map(e=>[e.id, e]));
+      valid.forEach(e=>map.set(e.id, e));
+      entries = [...map.values()];
+    }else{
+      if(!confirm('ERSTATTE alle nåværende data med innholdet i backupen? Dette kan ikke angres.')) return;
+      entries = valid;
+    }
+    save(); refreshAll();
+    alert('Gjenoppretting fullført ✓  Du har nå '+entries.length+' registreringer.');
+  };
+  reader.readAsText(fileObj);
+}
+function clearAll(){
+  if(!confirm('Dette sletter ALLE registreringer permanent. Er du sikker?')) return;
+  if(!confirm('Helt sikker? Dette kan ikke angres.')) return;
+  entries=[]; save(); refreshAll();
+}
+
+// ---- navigasjon ----
+function showView(v){
+  ['log','history','stats'].forEach(name=>{
+    document.getElementById('view-'+name).classList.toggle('hidden', name!==v);
+  });
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
+  if(v==='history') renderHistory();
+  if(v==='stats') renderStats();
+}
+
+// ---- backup-status & påminnelse ----
+function daysSinceBackup(){
+  if(!meta.lastBackupTs) return Infinity;
+  return Math.floor((Date.now()-meta.lastBackupTs)/86400000);
+}
+function newSinceBackup(){ return entries.length - (meta.lastBackupCount||0); }
+
+function renderBackupStatus(){
+  const el=document.getElementById('backup-status'); if(!el) return;
+  if(!meta.lastBackupTs){ el.innerHTML='⚠️ <b>Ingen backup tatt enda.</b> Ta din første nå.'; return; }
+  const d=new Date(meta.lastBackupTs);
+  const dd=daysSinceBackup();
+  const when = dd===0?'i dag':(dd===1?'i går':dd+' dager siden');
+  const nu = newSinceBackup();
+  el.innerHTML = `Siste backup: <b>${fmtDate(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}</b> (${when}).`
+    + (nu>0 ? `<br>📌 <b>${nu}</b> nye registreringer siden da.` : '<br>✓ Alt er sikkerhetskopiert.');
+}
+
+function isOverdue(){
+  if(meta.reminderDays===0) return false;            // påminnelse av
+  if(!meta.lastBackupTs) return entries.length>0;     // aldri tatt backup, men har data
+  return daysSinceBackup() >= meta.reminderDays && newSinceBackup() > 0;
+}
+
+let bannerDismissed=false;
+function renderBanner(){
+  const b=document.getElementById('backup-banner');
+  if(isOverdue() && !bannerDismissed){
+    const nu=newSinceBackup();
+    b.className='banner warn';
+    b.innerHTML = `<span>☁️ Du har <b>${nu}</b> ulagrede registreringer. Ta en backup til iCloud?</span>`
+      + `<span style="display:flex;gap:6px"><button id="banner-go">Backup</button><button class="x" id="banner-x">✕</button></span>`;
+    document.getElementById('banner-go').onclick=()=>backupNow();
+    document.getElementById('banner-x').onclick=()=>{ bannerDismissed=true; b.classList.add('hidden'); };
+  }else{
+    b.classList.add('hidden');
+  }
+}
+
+// ---- budsjett ----
+function renderBudget(){
+  const card=document.getElementById('budget-card');
+  if(!meta.budget || meta.budget<=0){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const spent=sumPeriod('month');
+  const pct=Math.min(100, Math.round(spent/meta.budget*100));
+  const left=meta.budget-spent;
+  document.getElementById('budget-text').textContent=`${fmt(spent)} av ${fmt(meta.budget)} (${pct}%)`;
+  const leftEl=document.getElementById('budget-left');
+  leftEl.textContent = left>=0 ? fmt(left)+' igjen' : fmt(-left)+' over';
+  leftEl.style.color = left<0 ? 'var(--danger)' : (pct>=80 ? 'var(--warn)' : 'var(--good)');
+  const bar=document.getElementById('budget-bar');
+  bar.style.width=pct+'%';
+  bar.style.background = pct>=100 ? 'var(--danger)' : (pct>=80 ? 'var(--warn)' : 'var(--good)');
+
+  // varsle én gang per måned-tilstand når 90%+ nås
+  const monthTag=todayStr().slice(0,7);
+  if(pct>=90 && meta.budgetWarned!==monthTag){
+    meta.budgetWarned=monthTag; saveMeta();
+    setTimeout(()=>alert(pct>=100
+      ? `⚠️ Du har brukt opp månedsbudsjettet (${fmt(spent)} av ${fmt(meta.budget)}).`
+      : `📊 Du har brukt ${pct}% av månedsbudsjettet.`), 200);
+  }
+}
+
+// ---- trendgraf (siste 8 uker) ----
+function renderTrend(){
+  const el=document.getElementById('trend');
+  const now=new Date(); now.setHours(0,0,0,0);
+  const thisWeek=startOfWeek(now);
+  const weeks=[];
+  for(let i=7;i>=0;i--){
+    const ws=new Date(thisWeek); ws.setDate(ws.getDate()-i*7);
+    const we=new Date(ws); we.setDate(we.getDate()+7);
+    let sum=0;
+    entries.forEach(e=>{ const d=new Date(e.date+'T00:00:00'); if(d>=ws && d<we) sum+=e.amount; });
+    weeks.push({ws, sum});
+  }
+  const max=Math.max(1, ...weeks.map(w=>w.sum));
+  const mon=['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  if(weeks.every(w=>w.sum===0)){ el.innerHTML='<div class="empty">Ingen data å vise enda.</div>'; return; }
+  el.innerHTML='<div style="display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:6px">'+
+    weeks.map(w=>{
+      const h=Math.round(w.sum/max*100);
+      const isNow=w.ws.getTime()===thisWeek.getTime();
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end">
+        <div style="font-size:9px;color:var(--muted);white-space:nowrap">${w.sum?Math.round(w.sum):''}</div>
+        <div title="${fmt(w.sum)}" style="width:100%;height:${h}%;min-height:2px;border-radius:4px 4px 0 0;background:${isNow?'var(--accent)':'var(--accent2)'};opacity:${isNow?1:.6}"></div>
+        <div style="font-size:9px;color:var(--muted)">${w.ws.getDate()}.${mon[w.ws.getMonth()]}</div>
+      </div>`;
+    }).join('')+'</div>';
+}
+
+// ---- kategoristyring ----
+function renderCatManager(){
+  const el=document.getElementById('cat-manager'); if(!el) return;
+  el.innerHTML=CATS.map(c=>
+    `<div class="breakdown-row">
+      <div class="ico">${c.ico}</div>
+      <div class="nm">${escapeHtml(c.name)}</div>
+      <button class="del" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer" onclick="delCat('${c.id}')">✕</button>
+    </div>`).join('');
+}
+function addCat(){
+  const ico=(document.getElementById('new-cat-ico').value.trim()||'📦');
+  const name=document.getElementById('new-cat-name').value.trim();
+  if(!name){ alert('Skriv inn et navn på kategorien.'); return; }
+  const id='c'+Date.now();
+  CATS.push({id, name, ico}); saveCats();
+  document.getElementById('new-cat-ico').value='';
+  document.getElementById('new-cat-name').value='';
+  renderCatManager(); renderChips(); renderCatFilter();
+}
+function delCat(id){
+  if(CATS.length<=1){ alert('Du må ha minst én kategori.'); return; }
+  if(!confirm('Slette denne kategorien? Tidligere registreringer beholdes, men vises som «Annet».')) return;
+  CATS=CATS.filter(c=>c.id!==id); saveCats();
+  if(selectedCat===id) selectedCat=CATS[0].id;
+  renderCatManager(); renderChips(); renderCatFilter(); refreshAll();
+}
+
+// ---- auto-backup via iOS Snarvei ----
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea'); ta.value=text;
+  ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  ta.remove();
+}
+async function autoBackupShortcut(){
+  const payload = JSON.stringify({app:'handlelogg', version:1, exported:todayStr(), count:entries.length, entries}, null, 2);
+  await copyText(payload);
+  meta.lastBackupTs=Date.now(); meta.lastBackupCount=entries.length; saveMeta();
+  renderBackupStatus(); renderBanner();
+  // kjør snarveien — den henter dataene fra utklippstavlen
+  window.location.href='shortcuts://run-shortcut?name='+encodeURIComponent(meta.shortcutName||'Handlelogg Backup');
+}
+
+function refreshAll(){
+  renderSummary(); renderHistory(); renderStats(); renderPlaces(); renderCatFilter();
+  renderBackupStatus(); renderBanner(); renderBudget(); renderTrend(); renderCatManager();
+}
+
+// ---- init ----
+// sjekk at lagring faktisk fungerer på denne enheten
+(function checkStorage(){
+  try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); }
+  catch(e){
+    const b=document.getElementById('backup-banner');
+    b.className='banner warn'; b.classList.remove('hidden');
+    b.innerHTML='<span>⚠️ <b>Lagring er blokkert her.</b> Åpne filen i Safari og legg den til på Hjem-skjermen, ellers blir ikke registreringene dine lagret.</span>';
+  }
+})();
+document.getElementById('f-date').value=todayStr();
+renderChips();
+renderCatFilter();
+refreshAll();
+
+document.getElementById('btn-add').onclick=addEntry;
+document.getElementById('btn-export').onclick=exportCSV;
+document.getElementById('btn-backup').onclick=backupNow;
+document.getElementById('btn-clear').onclick=clearAll;
+
+// gjenoppretting
+document.getElementById('btn-restore').onclick=()=>document.getElementById('file-restore').click();
+document.getElementById('file-restore').onchange=function(){
+  if(this.files && this.files[0]) restoreFromFile(this.files[0]);
+  this.value=''; // tillat samme fil på nytt senere
+};
+
+// påminnelse-innstilling
+const rd=document.getElementById('reminder-days');
+rd.value=String(meta.reminderDays);
+rd.onchange=()=>{ meta.reminderDays=parseInt(rd.value,10); saveMeta(); renderBanner(); };
+
+// budsjett
+const bi=document.getElementById('budget-input');
+bi.value=meta.budget||'';
+bi.onchange=()=>{ meta.budget=parseFloat(bi.value)||0; meta.budgetWarned=''; saveMeta(); renderBudget(); };
+
+// kategorier
+document.getElementById('btn-add-cat').onclick=addCat;
+
+// auto-backup snarvei
+document.getElementById('btn-shortcut').onclick=autoBackupShortcut;
+document.getElementById('shortcut-setup').onclick=()=>document.getElementById('shortcut-guide').classList.toggle('hidden');
+const sn=document.getElementById('shortcut-name');
+sn.value=meta.shortcutName||'Handlelogg Backup';
+sn.onchange=()=>{ meta.shortcutName=sn.value.trim()||'Handlelogg Backup'; saveMeta(); };
+document.getElementById('filter-cat').onchange=renderHistory;
+document.getElementById('filter-period').onchange=renderHistory;
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+
+// Enter i beløpsfelt = legg til
+document.getElementById('f-amount').addEventListener('keydown',e=>{ if(e.key==='Enter') addEntry(); });
+</script>
+</body>
+</html>
