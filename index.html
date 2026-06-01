@@ -122,7 +122,7 @@
     background:#fff; color:#111; border:none; border-radius:9px;
     padding:9px 13px; font-weight:700; font-size:13px; white-space:nowrap; cursor:pointer;
   }
-  .banner .x{background:transparent; color:inherit; padding:6px; font-size:16px}
+  .banner .x{background:transparent; color:inherit; padding:8px 12px; font-size:20px; line-height:1}
 
   .status{
     background:var(--card2); border:1px solid var(--line); border-radius:11px;
@@ -345,8 +345,8 @@ function save(){
   }
 }
 function loadMeta(){
-  try{ return Object.assign({lastBackupTs:0, lastBackupCount:0, reminderEvery:10, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}, JSON.parse(localStorage.getItem(META_KEY))||{}); }
-  catch(e){ return {lastBackupTs:0, lastBackupCount:0, reminderEvery:10, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:''}; }
+  try{ return Object.assign({lastBackupTs:0, lastBackupCount:0, reminderEvery:10, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:'', bannerSnoozeCount:0}, JSON.parse(localStorage.getItem(META_KEY))||{}); }
+  catch(e){ return {lastBackupTs:0, lastBackupCount:0, reminderEvery:10, budget:0, shortcutName:'Handlelogg Backup', budgetWarned:'', bannerSnoozeCount:0}; }
 }
 function saveMeta(){ localStorage.setItem(META_KEY, JSON.stringify(meta)); }
 function catOf(id){ return CATS.find(c=>c.id===id) || {id:'annet',name:'Annet',ico:'📦'}; }
@@ -544,6 +544,7 @@ async function backupNow(){
 
   meta.lastBackupTs = Date.now();
   meta.lastBackupCount = entries.length;
+  meta.bannerSnoozeCount = 0;            // nullstill snooze etter backup
   saveMeta();
   renderBackupStatus(); renderBanner();
 }
@@ -615,22 +616,29 @@ function renderBackupStatus(){
     + (nu>0 ? `<br>📌 <b>${nu}</b> nye registreringer siden da.` : '<br>✓ Alt er sikkerhetskopiert.');
 }
 
-function isOverdue(){
+let storageBlocked=false;
+function shouldShowBanner(){
   const every = meta.reminderEvery||0;
-  if(every<=0) return false;                 // påminnelse av
-  return newSinceBackup() >= every;          // f.eks. 10 nye registreringer siden siste backup
+  if(every<=0) return false;                          // påminnelse av
+  if(newSinceBackup() < every) return false;          // ikke nok nye registreringer
+  if(meta.bannerSnoozeCount && entries.length < meta.bannerSnoozeCount) return false; // snoozet av kryss
+  return true;
 }
-
-let bannerDismissed=false;
 function renderBanner(){
+  if(storageBlocked) return;                          // ikke overskriv lagrings-advarselen
   const b=document.getElementById('backup-banner');
-  if(isOverdue() && !bannerDismissed){
+  if(shouldShowBanner()){
     const nu=newSinceBackup();
     b.className='banner warn';
     b.innerHTML = `<span>☁️ Du har <b>${nu}</b> ulagrede registreringer. Ta en backup til iCloud?</span>`
-      + `<span style="display:flex;gap:6px"><button id="banner-go">Backup</button><button class="x" id="banner-x">✕</button></span>`;
+      + `<span style="display:flex;gap:8px;flex-shrink:0"><button id="banner-go">Backup</button><button class="x" id="banner-x" aria-label="Lukk">✕</button></span>`;
     document.getElementById('banner-go').onclick=()=>backupNow();
-    document.getElementById('banner-x').onclick=()=>{ bannerDismissed=true; b.classList.add('hidden'); };
+    document.getElementById('banner-x').onclick=()=>{
+      // snooz til neste terskel, og husk det på tvers av app-åpninger
+      meta.bannerSnoozeCount = entries.length + (meta.reminderEvery||10);
+      saveMeta();
+      b.classList.add('hidden');
+    };
   }else{
     b.classList.add('hidden');
   }
@@ -735,7 +743,7 @@ function fallbackCopy(text){
 async function autoBackupShortcut(){
   const payload = JSON.stringify({app:'handlelogg', version:1, exported:todayStr(), count:entries.length, entries}, null, 2);
   await copyText(payload);
-  meta.lastBackupTs=Date.now(); meta.lastBackupCount=entries.length; saveMeta();
+  meta.lastBackupTs=Date.now(); meta.lastBackupCount=entries.length; meta.bannerSnoozeCount=0; saveMeta();
   renderBackupStatus(); renderBanner();
   // kjør snarveien — den henter dataene fra utklippstavlen
   window.location.href='shortcuts://run-shortcut?name='+encodeURIComponent(meta.shortcutName||'Handlelogg Backup');
@@ -751,6 +759,7 @@ function refreshAll(){
 (function checkStorage(){
   try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); }
   catch(e){
+    storageBlocked=true;
     const b=document.getElementById('backup-banner');
     b.className='banner warn'; b.classList.remove('hidden');
     b.innerHTML='<span>⚠️ <b>Lagring er blokkert her.</b> Åpne filen i Safari og legg den til på Hjem-skjermen, ellers blir ikke registreringene dine lagret.</span>';
